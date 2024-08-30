@@ -1,8 +1,9 @@
-import { Component, inject, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, inject, OnDestroy, ViewChild } from '@angular/core';
 import { FormBuilder, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { RouterOutlet } from '@angular/router';
-import { Subject, Subscription, tap } from 'rxjs';
-import { FileUploading, FileUploadStatus } from './models/FileUploading';
+import { combineLatest, concatMap, filter, fromEvent, map, Subject, Subscription } from 'rxjs';
+import { createFileReaderObservable, ProgressEventType } from './util/file-upload.util';
+import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-root',
@@ -10,100 +11,63 @@ import { FileUploading, FileUploadStatus } from './models/FileUploading';
   imports: [
     RouterOutlet,
     FormsModule,
-    ReactiveFormsModule,
+    CommonModule,
+    ReactiveFormsModule
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css'
 })
-export class AppComponent implements OnInit, OnDestroy {
-  fb = inject(FormBuilder);
+export class AppComponent implements OnDestroy, AfterViewInit {
 
-  subscription = new Subscription
+  private fb = inject(FormBuilder);
+  private subscription = new Subscription;
+  fileListSubject = new Subject<Array<File>>();
 
-  progressPercent = 0;
-  isUploading = false;
-  fileName = '';
-  fileReader: null | FileReader = null;
+  @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
 
-  fileUploadingMap = new Map<string, FileUploading>();
+  fileUploads$ = this.fileListSubject.pipe(
+    concatMap(files => combineLatest(files.map(file => createFileReaderObservable(file)))),
+  );
 
-  public get fileUploads() : Array<FileUploading> {
-    const result = Array.from(this.fileUploadingMap.values());
-    console.log('sup, im file uploads', result, this.fileUploadingMap);
-    return result;
-  }
-
-  public get isAllFilesFinished(): boolean {
-    return this.fileUploads.every(file => file.status === FileUploadStatus.UPLOADED || file.status === FileUploadStatus.ERROR || file.status === FileUploadStatus.ABORTED);
-  }
-
-  formGroup = this.fb.group({
-    file: [''],
-  });
-
-  fileListSubject = new Subject<FileList>();
-
-  fileUpload$ = this.fileListSubject.pipe(
-    tap(fileList => {
-      console.log('we made it boys!');
-      const file = fileList.item(0)!;
-
-      this.isUploading = true;
-      for (const file of Array.from(fileList)) {
-        const fileName = file.name;
-        const fileReader = new FileReader();
-
-        this.fileUploadingMap.set(fileName, {
-          name: fileName,
-          progressPercent: 0,
-          status: FileUploadStatus.UPLOADING,
-          fileReader,
-        })
-
-        fileReader.onprogress = ({loaded, total}) => {
-          console.log(`loaded: ${loaded} total: ${loaded} / ${total}`);
-          this.fileUploadingMap.get(fileName)!.progressPercent = Math.round((loaded / total) * 100)
-        }
-
-        fileReader.onloadend = (event) => {
-          const result = event.target?.result as ArrayBuffer | null | undefined;
-          if (result){
-            // do the things
-          }
-          this.fileUploadingMap.get(fileName)!.progressPercent = 100;
-        }
-
-        fileReader.readAsArrayBuffer(file);
-      }
-    }),
+  moveToOcr$ = this.fileUploads$.pipe(
+    filter(files => files.every(file => file.type === ProgressEventType.LoadEnd)),
+    // switchMap(files => {
+    //   of(files)
+    // })   TODO: Implement making calls to validate files for OCR
   )
 
-  title = 'api-demo';
+  public progresses$ = this.fileUploads$.pipe(
+    map(results => {
+      return results
+        .filter(event =>  event.type !== ProgressEventType.Error && event.type)
+        .map(event => ({
+          name: event.file.name,
+          progressPercentage: event.type === ProgressEventType.Abort ? 0 : Math.round((event.event.loaded / event.event.total) * 100),
+          fileReader: event.fileReader
+      }))
+    })
+  );
 
-  ngOnInit(): void {
-    const fileUploadSub = this.fileUpload$.subscribe();
-    this.subscription.add(fileUploadSub);
-  }
+  public formGroup = this.fb.group({file: ''});
 
-  handleChange(event: Event) {
-    const target = event.target as HTMLInputElement;
-    const files = target.files;
-    if (files && files.length > 0) {
-      this.fileListSubject.next(files);
-    }
-  }
+  ngAfterViewInit(): void {
+    const clickSub = fromEvent(this.fileInput.nativeElement, 'change')
+      .pipe(filter(event => (event.target as HTMLInputElement).files !== null))
+      .subscribe((event) => this.fileListSubject.next(Array.from((event.target as HTMLInputElement).files!)));
 
-  handleProgress(event: ProgressEvent<EventTarget>) {
-    console.log('huh');
-    console.log(event);
+    this.subscription.add(clickSub);
   }
 
   ngOnDestroy(): void {
     this.subscription.unsubscribe();
   }
 
-  handleAbort(fileName: string) {
-    this.fileUploadingMap.get(fileName)!.fileReader.abort();
-    this.fileUploadingMap.get(fileName)!.status = FileUploadStatus.ABORTED;
+  handleAbort(fileReader: FileReader) {
+    console.log(fileReader);
+    fileReader.abort();
+  }
+
+  trackByFn(index: number, item: any) {
+    return item.name; // or any unique identifier
   }
 }

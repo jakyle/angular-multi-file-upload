@@ -1,41 +1,42 @@
-<div class="h-screen w-screen bg-blue-200 flex items-center justify-center">
+<div class="h-screen w-screen bg-slate-100 flex items-center justify-center">
 
   <form 
     [formGroup]="formGroup"
-    class="size-3/4 border border-slate-400 rounded flex flex-col justify-center items-center"
+    class="size-3/4 border border-slate-400 rounded flex flex-col gap-4 justify-center items-center bg-white shadow-md"
   >
     <label for="fileUpload" class="flex flex-col gap-y-2 items-center justify-center border border-solid border-black rounded w-fit">
       <span>File Upload</span>
       <input
+        #fileInput
         multiple
-        (change)="handleChange($event)"
-        (progress)="handleProgress($event)"
         formControlName="file" 
         id="fileUpload"
         type="file"
       />
     </label>
 
-    <ul class="flex flex-col gap-y-2">
-      @if(isUploading) {
-        @for (fileUpload of fileUploads; track fileUpload) {
-          <li>
-            <div class="flex flex-x-2">
+    @if (progresses$ | async; as progresses) {
+      <ul class="flex flex-col gap-y-2 w-5/12">
+        @for (fileUpload of progresses; track trackByFn) {
+          <li class="w-full">
+            <div class="w-full flex flex-col gap-y-4 items-center border-slate-500">
               <span>{{fileUpload.name}}</span>
-              <progress class="" [max]="100" [value]="fileUpload.progressPercent"></progress>
-              <button
-                class="rounded px-2 py-1 border-slate-400 bg-red-300"
-                type="button"
-                (click)="handleAbort(fileUpload.name)"
-              >
-                  abort!
-              </button>
+              <div class="flex gap-x-2 border">
+                <progress class="rounded-lg h-3 flex-grow transition-all progress-filled:bg-green-800 progress-unfilled:bg-slate-200" [max]="100" [value]="fileUpload.progressPercentage"></progress>
+                <button
+                  class="rounded px-2 py-1 border-slate-400 bg-red-300 flex-none"
+                  type="button"
+                  (click)="handleAbort(fileUpload.fileReader)"
+                >
+                    abort!
+                </button>
+              </div>
             </div>
           </li>
         }
-      }
     </ul>
+    }
 
-    <button class="disabled:bg-slate-200 bg-green-500 px-2 py-2 rounded border" [disabled]="!isAllFilesFinished">submit or whatever</button>
+    <!-- <button class="disabled:bg-slate-200 bg-green-500 px-2 py-2 rounded border" [disabled]="!isAllFilesFinished">submit or whatever</button> -->
   </form>
 </div>
