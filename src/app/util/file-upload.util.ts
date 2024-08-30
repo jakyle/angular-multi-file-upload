@@ -9,7 +9,14 @@ export enum ProgressEventType {
 	Error = 'error',
 }
 
-export function createFileReaderObservable(file: File): Observable<{  event: ProgressEvent<FileReader>, type: ProgressEventType, file: File, fileReader: FileReader }> {
+type FileProgress = {
+	event: ProgressEvent<FileReader>, 
+	type: ProgressEventType, 
+	file: File, 
+	fileReader: FileReader
+}
+
+export function createFileReaderObservable(file: File): Observable<FileProgress> {
 	const fileReader = new FileReader();
 
 	const events: Array<ProgressEventType> = [
