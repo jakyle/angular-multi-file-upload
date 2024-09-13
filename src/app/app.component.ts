@@ -40,10 +40,10 @@ export class AppComponent implements OnDestroy, AfterViewInit {
     map(results => {
       return results
         .filter(event =>  event.type !== ProgressEventType.Error && event.type)
-        .map(event => ({
-          name: event.file.name,
-          progressPercentage: event.type === ProgressEventType.Abort ? 0 : Math.round((event.event.loaded / event.event.total) * 100),
-          fileReader: event.fileReader
+        .map(({file, type, fileReader, event}) => ({
+          name: file.name,
+          progressPercentage: type === ProgressEventType.Abort ? 0 : Math.round((event.loaded / event.total) * 100),
+          fileReader
       }))
     })
   );

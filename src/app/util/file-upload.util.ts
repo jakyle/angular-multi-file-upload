@@ -9,7 +9,7 @@ export enum ProgressEventType {
 	Error = 'error',
 }
 
-type FileProgress = {
+export type FileProgress = {
 	event: ProgressEvent<FileReader>, 
 	type: ProgressEventType, 
 	file: File, 
